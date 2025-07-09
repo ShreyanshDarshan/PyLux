@@ -4,13 +4,15 @@ import taichi as ti
 
 ti.init(arch=ti.gpu)
 
-n = 700
-pixels = ti.field(dtype=float, shape=(n, n))
-pixels.fill(0)  # Initialize all cells to dead
-new_pixels = ti.field(dtype=float, shape=pixels.shape)
-new_pixels.fill(0)  # Initialize new pixels
+n = 500
+fac = 1
+frame_fac = 1.0 #1000.0
+history = ti.field(dtype=float, shape=(n, n))
+history.fill(-1)  # Initialize all cells to dead
+tmp_history = ti.field(dtype=float, shape=history.shape)
+display_img = ti.field(dtype=float, shape=history.shape)
 
-cursor_pos = []
+cursor_pos = ti.field(dtype=ti.types.vector(2, int), shape=(n*2))
 
 @ti.func
 def ti_max(a: float, b: float) -> float:
@@ -18,27 +20,45 @@ def ti_max(a: float, b: float) -> float:
 
 @ti.kernel
 def update(x: int, y: int, frame: float):
-    for i, j in pixels:
-        max_val = pixels[i, j]
+    print (f"Updating cell at ({x}, {y}) with frame {frame}")
+    for i, j in history:
+        selected_frame = -1
         for di in range(-1, 2):
             for dj in range(-1, 2):
                 ni, nj = (i + di) % n, (j + dj) % n
-                max_val = ti_max(max_val, pixels[ni, nj])
+                # nbr_offset = ti.Vector([di, dj])
+                nbr_frame_id = history[ni, nj]
+                if nbr_frame_id < 0:
+                    continue
+                nbr_frame_id = int(nbr_frame_id)
+                charge_pos = cursor_pos[int(nbr_frame_id)]
+                rvec_center = ti.Vector([i, j]) - charge_pos
+                dist_kernel_center = rvec_center.norm()
+                dist_circle_center = (frame - nbr_frame_id)
+                if (dist_kernel_center - dist_circle_center) <= 1:
+                    if selected_frame < nbr_frame_id:
+                        selected_frame = nbr_frame_id
+                # print (f"(i,j)({i}, {j}) - offset({di}, {dj}) -> nbr({ni}, {nj}) | nbr_frame_id: {nbr_frame_id} | charge_pos: {charge_pos} | selected_frame: {selected_frame} | dist_kernel_center: {dist_kernel_center} | dist_circle_center: {dist_circle_center}")
 
-        new_pixels[i, j] = max_val
-    for i, j in pixels:
-        pixels[i, j] = new_pixels[i, j]
-    pixels[x, y] = frame
+        tmp_history[i, j] = selected_frame
+    for i, j in history:
+        history[i, j] = tmp_history[i, j]
+    history[x, y] = frame
 
 # Add interactivity to toggle cells
 
-gui = ti.GUI("Lux", res=(n, n))
+gui = ti.GUI("Lux", res=(n*fac, n*fac))
 
-pause_state = False
+@ti.kernel
+def make_visible():
+    for i, j in history:
+        display_img[i, j] = history[i, j] / 1000.0
 
+frame = 0
 while gui.running:
     # breakpoint()
-    gui.set_image(pixels)  # Convert bool to u8 for display
+    make_visible()
+    gui.set_image(display_img)
     gui.show()
     
     # for e in gui.get_events(ti.GUI.PRESS):
@@ -51,7 +71,7 @@ while gui.running:
     #     x, y = gui.get_cursor_pos()
     #     toggle_cell(int(x * n), int(y * n))
     #     print(f"Toggled cell at ({int(x * n)}, {int(y * n)})")    
-    
+
     mx, my = gui.get_cursor_pos()
     if mx <= 0 or mx >= 1 or my <= 0 or my >= 1:
         mx = 0.5
@@ -59,6 +79,7 @@ while gui.running:
     mx = int(mx * n)
     my = int(my * n)
 
-    cursor_pos.append((mx, my))
-    if not pause_state:
-        update(mx, my, gui.frame / 1000.0)
+    cursor_pos[int(frame)] = ti.Vector([mx, my])
+    update(mx, my, frame)
+    # breakpoint()
+    frame += 1
