@@ -22,8 +22,6 @@ def update(x: int, y: int, frame: float):
         max_val = pixels[i, j]
         for di in range(-1, 2):
             for dj in range(-1, 2):
-                if di == 0 and dj == 0:
-                    continue
                 ni, nj = (i + di) % n, (j + dj) % n
                 max_val = ti_max(max_val, pixels[ni, nj])
 
