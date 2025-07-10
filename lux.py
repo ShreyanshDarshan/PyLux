@@ -17,7 +17,6 @@ sim = Simulator(world=world, grid_size=(1000, 500))
 viz = Visualizer(world=sim.world)
 
 while viz.running:
-    viz.make_visible()
     viz.render()
 
     # mx, my = gui.get_cursor_pos()

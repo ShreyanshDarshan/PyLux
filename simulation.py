@@ -21,13 +21,13 @@ class Simulator:
 
     def update(self):
         for charge in self.world.charges:
-            charge.update_pos_history(self.step)
             charge.update_hind_field(self.step)
+            charge.update_electric_field()
 
         self.world.charges[0].position = ti.Vector(
             [
-                500 + 100 * math.sin(self.step * 0.01),
-                250 + 100 * math.cos(self.step * 0.01),
+                500 + 50 * math.sin(self.step * 0.01),
+                250 + 50 * math.cos(self.step * 0.01),
             ]
         )
 
