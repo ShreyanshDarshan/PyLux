@@ -20,7 +20,10 @@ class Charge:
 
         pos_history_size = int(math.sqrt(grid_size[0] ** 2 + grid_size[1] ** 2) * 1.2)
         self.pos_history = ti.Vector.field(2, dtype=float, shape=(pos_history_size,))
+        self.pos_buffer = ti.Vector.field(2, dtype=float, shape=(pos_history_size,))
+
         self.acc_history = ti.Vector.field(2, dtype=float, shape=(pos_history_size,))
+        self.acc_buffer = ti.Vector.field(2, dtype=float, shape=(pos_history_size,))
 
         # Initialize electric field
         self.electric_field = ti.Vector.field(2, dtype=float, shape=grid_size)
@@ -38,7 +41,7 @@ class Charge:
                     nbr_hind = int(self.hind_field[ni, nj])
                     if nbr_hind < 0:
                         continue
-                    historical_pos = self.pos_history[nbr_hind]
+                    historical_pos = self.pos_history[step - nbr_hind]
                     rvec_center = ti.Vector([i, j]) - historical_pos
                     dist_kernel_center = rvec_center.norm()
                     radius_circle = step - nbr_hind
@@ -51,18 +54,18 @@ class Charge:
         # Update the hind field with the buffer
         for i, j in self.hind_field:
             self.hind_field[i, j] = self.hind_buffer[i, j]
-        x, y = int(self.pos_history[int(step)])
+        x, y = int(self.pos_history[0])
         self.hind_field[x, y] = step
 
     @ti.kernel
-    def update_electric_field(self):
+    def update_electric_field(self, step: int):
         # grid_size = self.electric_field.shape
         for i, j in self.electric_field:
             hind = self.hind_field[i, j]
             if hind >= 0:
-                historical_pos = self.pos_history[hind]
+                historical_pos = self.pos_history[step - hind]
                 rvec_center = ti.Vector([i, j]) - historical_pos
-                historical_acc = self.acc_history[hind]
+                historical_acc = self.acc_history[step - hind]
                 dist_kernel_center = rvec_center.norm()
                 hist_acc_perp = (
                     historical_acc
@@ -75,6 +78,21 @@ class Charge:
                 )
                 self.electric_field[i, j] = electric_strength
 
+    @ti.kernel
+    def _update_histories(self):
+        for i in self.pos_buffer:
+            if i > 0:
+                self.pos_buffer[i] = self.pos_history[i - 1]
+
+        for i in self.pos_history:
+            self.pos_history[i] = self.pos_buffer[i]
+
+        for i in self.acc_buffer:
+            if i > 0:
+                self.acc_buffer[i] = self.acc_history[i - 1]
+        for i in self.acc_history:
+            self.acc_history[i] = self.acc_buffer[i]
+
     def update_histories(self, step: int):
         if step == 0:
             self.last_position = self.position
@@ -82,8 +100,11 @@ class Charge:
 
         self.velocity = self.position - self.last_position
         self.acceleration = self.velocity - self.last_velocity
-        self.pos_history[step] = self.position
-        self.acc_history[step] = self.acceleration
+
+        self._update_histories()
+        self.pos_history[0] = self.position
+        self.acc_history[0] = self.acceleration
+        # breakpoint()
 
         self.last_position = self.position
         self.last_velocity = self.velocity
