@@ -10,10 +10,14 @@ ti.init(arch=ti.gpu)
 
 
 world = World(
-    world_size=(1000, 500),
-    charges=[Charge(ti.Vector([500, 250]), ti.Vector([0, 0]), grid_size=(1000, 500))],
+    world_size=(500, 500, 500),
+    charges=[
+        Charge(
+            ti.Vector([250, 250, 250]), ti.Vector([0, 0, 0]), grid_size=(500, 500, 500)
+        )
+    ],
 )
-sim = Simulator(world=world, grid_size=(1000, 500))
+sim = Simulator(world=world, grid_size=(500, 500, 300))
 viz = Visualizer(world=sim.world)
 
 while viz.running:

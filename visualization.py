@@ -7,12 +7,12 @@ from charge import Charge
 class Visualizer:
     def __init__(self, world: World, win_name="Lux"):
         self.world = world
-        self.display_img = ti.Vector.field(3, dtype=float, shape=world.world_size)
+        self.display_img = ti.Vector.field(3, dtype=float, shape=world.world_size[:2])
 
         # Initialize the display image with zeros
         self.display_img.fill(ti.Vector([0.0, 0.0, 0.0]))
 
-        self.gui = ti.GUI("Lux", res=world.world_size)
+        self.gui = ti.GUI("Lux", res=world.world_size[:2])
 
     @ti.kernel
     def show_charge_hind(self):
@@ -24,7 +24,7 @@ class Visualizer:
     @ti.kernel
     def show_charge_electric_field(self):
         for i, j in self.display_img:
-            color_rg = abs(self.world.charges[0].electric_field[i, j]) * 10000.0
+            color_rg = 0.5 + self.world.charges[0].electric_field[i, j, 250] * 500.0
             color_rgb = ti.Vector([color_rg[0], color_rg[1], 0.0])
             self.display_img[i, j] = color_rgb
 
